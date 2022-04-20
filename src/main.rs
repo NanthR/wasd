@@ -7,7 +7,8 @@ fn main() {
     println!("In file {}", filename);
 
     let mut lexer = lexer::Lexer::from_file(filename);
-    match parser::parse(lexer.lex()) {
+    let parser = parser::Parser::new(lexer.lex());
+    match parser.parse() {
         Ok(p) => println!("{}", utils::get_sexp(&p)),
         Err(x) => println!("{}", x)
     }
