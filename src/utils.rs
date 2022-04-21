@@ -7,7 +7,12 @@ pub fn get_sexp(parse_node: &ParseNode) -> String {
         format!(
             "({:?} {})",
             parse_node.current,
-            parse_node.children.iter().map(|x| get_sexp(&x)).collect::<Vec<String>>().join(" ")
+            parse_node
+                .children
+                .iter()
+                .map(get_sexp)
+                .collect::<Vec<String>>()
+                .join(" ")
         )
     }
 }

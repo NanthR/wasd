@@ -9,7 +9,11 @@ fn main() {
     let mut lexer = lexer::Lexer::from_file(filename);
     let parser = parser::Parser::new(lexer.lex());
     match parser.parse() {
-        Ok(p) => println!("{}", utils::get_sexp(&p)),
-        Err(x) => println!("{}", x)
+        Ok(p) => {
+            for i in p.iter() {
+                println!("{}", utils::get_sexp(i));
+            }
+        }
+        Err(x) => println!("{}", x),
     }
 }

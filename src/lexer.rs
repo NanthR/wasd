@@ -2,8 +2,6 @@ use std::fs;
 use std::iter::Peekable;
 use std::vec::IntoIter;
 
-type Result<T> = std::result::Result<T, String>;
-
 #[derive(Debug)]
 pub struct Lexer {
     raw_data: Peekable<IntoIter<char>>,

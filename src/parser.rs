@@ -3,7 +3,8 @@ use crate::lexer::{Operator, Token};
 program := statement
 statement := decl statement | decl
 decl := var_dec
-var_dec := let iden equal expr
+var_dec := let iden equal val
+val := expr | string
 expr := summand | summand plus expr | summand minus expr
 summand := term * summand | term
 term := num | (expr)
@@ -22,7 +23,7 @@ impl ParseNode {
 }
 
 pub struct Parser {
-    tokens: Vec<Token>
+    tokens: Vec<Token>,
 }
 
 impl Parser {
@@ -30,7 +31,7 @@ impl Parser {
         Parser { tokens }
     }
 
-    pub fn parse(&self) -> Result<ParseNode, String> {
+    pub fn parse(&self) -> Result<Vec<ParseNode>, String> {
         self.parse_statement(0).and_then(|(n, i)| {
             if i == self.tokens.len() {
                 Ok(n)
@@ -40,12 +41,14 @@ impl Parser {
         })
     }
 
-    fn parse_statement(&self, pos: usize) -> Result<(ParseNode, usize), String> {
-        let (node, next_pos) = self.parse_decl(pos)?;
-        let c = self.tokens.get(next_pos);
-        match c {
-            _ => Ok((node, next_pos)),
+    fn parse_statement(&self, mut pos: usize) -> Result<(Vec<ParseNode>, usize), String> {
+        let mut res: Vec<ParseNode> = vec![];
+        while self.tokens.get(pos).is_some() {
+            let (node, next_pos) = self.parse_decl(pos)?;
+            pos = next_pos;
+            res.push(node)
         }
+        Ok((res, pos))
     }
 
     fn parse_decl(&self, pos: usize) -> Result<(ParseNode, usize), String> {
@@ -55,11 +58,27 @@ impl Parser {
                     if let (Some(id), Some(Token::Operator(Operator::Equal))) =
                         (self.tokens.get(pos + 1), self.tokens.get(pos + 2))
                     {
-                        let (node, next_pos) = self.parse_expr(pos + 3)?;
-                        Ok((
-                            ParseNode::new(Token::Let, vec![ParseNode::new(id.clone(), vec![]), node]),
-                            next_pos,
-                        ))
+                        if let Some(Token::StringLiteral(x)) = self.tokens.get(pos + 3) {
+                            Ok((
+                                ParseNode::new(
+                                    Token::Let,
+                                    vec![
+                                        ParseNode::new(id.clone(), vec![]),
+                                        ParseNode::new(Token::StringLiteral(x.to_string()), vec![]),
+                                    ],
+                                ),
+                                pos + 4,
+                            ))
+                        } else {
+                            let (node, next_pos) = self.parse_expr(pos + 3)?;
+                            Ok((
+                                ParseNode::new(
+                                    Token::Let,
+                                    vec![ParseNode::new(id.clone(), vec![]), node],
+                                ),
+                                next_pos,
+                            ))
+                        }
                     } else {
                         Err("Invalid decl".to_string())
                     }
@@ -107,13 +126,10 @@ impl Parser {
             } else {
                 Err("Parantheses not closed".to_string())
             }
-        }
-        else if let Some(n @ Token::Number(_)) = c {
+        } else if let Some(n @ Token::Number(_)) = c {
             Ok((ParseNode::new(n.clone(), vec![]), pos + 1))
         } else {
             Err("Couldn't do".to_string())
         }
     }
 }
-
-
