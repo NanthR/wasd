@@ -6,7 +6,7 @@ decl := var_dec
 var_dec := let iden equal val
 val := expr | string
 expr := summand | summand plus expr | summand minus expr
-summand := term * summand | term
+summand := term / summand | term * summand | term
 term := num | (expr)
 */
 
@@ -83,7 +83,10 @@ impl Parser {
                         Err("Invalid decl".to_string())
                     }
                 }
-                _ => Err("Not implemented".to_string()),
+                x => {
+                    println!("{:?}", x);
+                    Err("Not implemented".to_string())
+                }
             },
             _ => Err("Couldn't be parsed".to_string()),
         }
@@ -92,28 +95,26 @@ impl Parser {
     fn parse_expr(&self, pos: usize) -> Result<(ParseNode, usize), String> {
         let (node, next_pos) = self.parse_summand(pos)?;
         let c = self.tokens.get(next_pos);
-        if let Some(&Token::Operator(Operator::Plus)) = c {
-            let (rhs, i) = self.parse_expr(next_pos + 1)?;
-            Ok((
-                ParseNode::new(Token::Operator(Operator::Plus), vec![node, rhs]),
-                i,
-            ))
-        } else {
-            Ok((node, next_pos))
+        match c {
+            t
+            @ (Some(Token::Operator(Operator::Plus)) | Some(Token::Operator(Operator::Minus))) => {
+                let (rhs, i) = self.parse_expr(next_pos + 1)?;
+                Ok((ParseNode::new(t.unwrap().clone(), vec![node, rhs]), i))
+            }
+            _ => Ok((node, next_pos)),
         }
     }
 
     fn parse_summand(&self, pos: usize) -> Result<(ParseNode, usize), String> {
         let (node, next_pos) = self.parse_term(pos)?;
         let c = self.tokens.get(next_pos);
-        if let Some(&Token::Operator(Operator::Multiply)) = c {
-            let (rhs, i) = self.parse_summand(next_pos + 1)?;
-            Ok((
-                ParseNode::new(Token::Operator(Operator::Multiply), vec![node, rhs]),
-                i,
-            ))
-        } else {
-            Ok((node, next_pos))
+        match c {
+            t @ (Some(Token::Operator(Operator::Multiply))
+            | Some(Token::Operator(Operator::Divide))) => {
+                let (rhs, i) = self.parse_summand(next_pos + 1)?;
+                Ok((ParseNode::new(t.unwrap().clone(), vec![node, rhs]), i))
+            }
+            _ => Ok((node, next_pos)),
         }
     }
 

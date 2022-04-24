@@ -37,8 +37,7 @@ impl Lexer {
                                 }
                             }
                         } else {
-                            println!("Invalid comment string");
-                            break;
+                            res.push(Token::Operator(Operator::Divide))
                         }
                     }
                 }
@@ -172,6 +171,7 @@ pub enum Operator {
     Plus,
     Minus,
     Multiply,
+    Divide,
     Equal,
     LessThan,
     LessThanEqual,
