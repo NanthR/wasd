@@ -2,15 +2,18 @@ use crate::lexer::{Operator, Token};
 /*
 program := statement
 statement := decl statement | decl
-decl := var_dec
+decl := var_dec | if_statement
+if_statement := if cond { statement } | if cond { statement } else { statement }
 var_dec := let iden equal val
 val := expr | string
 expr := summand | summand plus expr | summand minus expr
 summand := term / summand | term * summand | term
 term := num | (expr)
+cond := expr | expr comp_op expr
+comp_op := > | >= | == | <= | <
 */
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ParseNode {
     pub current: Token,
     pub children: Vec<ParseNode>,
@@ -43,7 +46,7 @@ impl Parser {
 
     fn parse_statement(&self, mut pos: usize) -> Result<(Vec<ParseNode>, usize), String> {
         let mut res: Vec<ParseNode> = vec![];
-        while self.tokens.get(pos).is_some() {
+        while self.tokens.get(pos).is_some() && (self.tokens.get(pos) != Some(&Token::RightCurly)){
             let (node, next_pos) = self.parse_decl(pos)?;
             pos = next_pos;
             res.push(node)
@@ -82,13 +85,48 @@ impl Parser {
                     } else {
                         Err("Invalid decl".to_string())
                     }
+                },
+                Token::If => {
+                    println!("If");
+                    let (cond, next_pos) = self.parse_cond(pos + 1)?;
+                    let c = self.tokens.get(next_pos);
+                    match c {
+                        Some(Token::LeftCurly) => {
+                            let (node, next_pos) = self.parse_statement(next_pos + 1)?;
+                            println!("{:?}", node);
+                            Ok((ParseNode::new(Token::If, node), next_pos))
+                        }
+                        _ => {
+                            Err("Missing left curly brace".to_string())
+                        }
+                    }
                 }
                 x => {
                     println!("{:?}", x);
                     Err("Not implemented".to_string())
                 }
             },
-            _ => Err("Couldn't be parsed".to_string()),
+            None => {
+                Err("Couldn't be parsed".to_string())
+            },
+        }
+    }
+
+
+    fn parse_cond(&self, pos: usize) -> Result<(ParseNode, usize), String> {
+        println!("Cond");
+        let (node, next_pos) = self.parse_expr(pos)?;
+        let c = self.tokens.get(next_pos);
+        match c {
+            t @ (Some(Token::Operator(Operator::GreaterThan))
+            | Some(Token::Operator(Operator::GreaterThanEqual))
+            | Some(Token::Operator(Operator::LessThan))
+            | Some(Token::Operator(Operator::LessThanEqual))
+            | Some(Token::Operator(Operator::Equality))) => {
+                let (rhs, i) = self.parse_expr(next_pos + 1)?;
+                Ok((ParseNode::new(t.unwrap().clone(), vec![node, rhs]), i))
+            }
+            _ => Ok((node, next_pos)),
         }
     }
 

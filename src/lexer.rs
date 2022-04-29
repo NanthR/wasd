@@ -1,6 +1,7 @@
 use std::fs;
 use std::iter::Peekable;
 use std::vec::IntoIter;
+use crate::parser::ParseNode;
 
 #[derive(Debug)]
 pub struct Lexer {
@@ -27,6 +28,8 @@ impl Lexer {
                 '-' => res.push(Token::Operator(Operator::Minus)),
                 '(' => res.push(Token::LeftParen),
                 ')' => res.push(Token::RightParen),
+                '{' => res.push(Token::LeftCurly),
+                '}' => res.push(Token::RightCurly),
                 '/' => {
                     if let Some(x) = self.raw_data.peek() {
                         if *x == '/' {
@@ -157,6 +160,9 @@ impl Lexer {
                     res.push(match str.as_str() {
                         "print" => Token::Print,
                         "let" => Token::Let,
+                        "if" => Token::If,
+                        "elif" => Token::Elif,
+                        "else" => Token::Else,
                         _ => Token::Identifier(str),
                     });
                 }
@@ -186,9 +192,14 @@ pub enum Token {
     StringLiteral(String),
     Print,
     Let,
+    If,
+    Elif,
+    Else,
     SemiColon,
     Number(f32),
     Identifier(String),
     LeftParen,
     RightParen,
+    LeftCurly,
+    RightCurly,
 }
