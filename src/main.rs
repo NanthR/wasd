@@ -4,8 +4,6 @@ mod utils;
 
 fn main() {
     let filename = "test.asdf";
-    println!("In file {}", filename);
-
     let mut lexer = lexer::Lexer::from_file(filename);
     let lexed = lexer.lex();
     // println!("{:?}", lexed);

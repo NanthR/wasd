@@ -1,4 +1,5 @@
 use crate::lexer::{Operator, Token};
+use std::collections::HashSet;
 
 /*
 program := statement
@@ -47,36 +48,44 @@ impl Parser {
         self.tokens.get(self.cur + offset).cloned()
     }
 
+    fn next(&mut self) -> Option<Token> {
+        let res = self.tokens.get(self.cur).cloned();
+        self.advance();
+        res
+    }
+
     fn advance(&mut self) {
         self.cur += 1;
     }
 
     pub fn parse(&mut self) -> Result<Vec<ParseNode>, String> {
-        let res = self.parse_statement()?;
+        let mut env = HashSet::new();
+        let res = self.parse_statement(&mut env)?;
         if self.peek().is_none() {
+            println!();
             Ok(res)
         } else {
             Err("Invalid parse".to_string())
         }
     }
 
-    fn parse_statement(&mut self) -> Result<Vec<ParseNode>, String> {
+    fn parse_statement(&mut self, env: &mut HashSet<Token>) -> Result<Vec<ParseNode>, String> {
         let mut res: Vec<ParseNode> = vec![];
         while self.peek().is_some() && self.peek() != Some(Token::RightCurly) {
-            let node = self.parse_decl()?;
+            let node = self.parse_decl(env)?;
             res.push(node)
         }
         Ok(res)
     }
 
-    fn parse_decl(&mut self) -> Result<ParseNode, String> {
-        match self.peek() {
+    fn parse_decl(&mut self, env: &mut HashSet<Token>) -> Result<ParseNode, String> {
+        match self.next() {
             Some(t) => match t {
                 Token::Let => {
                     if let (Some(Token::Identifier(id)), Some(Token::Operator(Operator::Equal))) =
-                        (self.peek_n(1), self.peek_n(2))
+                        (self.peek(), self.peek_n(1))
                     {
-                        self.advance();
+                        env.insert(Token::Identifier(id.clone()));
                         self.advance();
                         self.advance();
                         if let Some(Token::StringLiteral(x)) = self.peek() {
@@ -86,15 +95,11 @@ impl Parser {
                                 None,
                                 vec![
                                     ParseNode::new(Token::Identifier(id), None, vec![]),
-                                    ParseNode::new(
-                                        Token::StringLiteral(x),
-                                        None,
-                                        vec![],
-                                    ),
+                                    ParseNode::new(Token::StringLiteral(x), None, vec![]),
                                 ],
                             ))
                         } else {
-                            let node = self.parse_expr(0)?;
+                            let node = self.parse_expr(0, env)?;
                             Ok(ParseNode::new(
                                 Token::Let,
                                 None,
@@ -106,17 +111,12 @@ impl Parser {
                     }
                 }
                 Token::While => {
-                    self.advance();
-                    if let Some(Token::LeftParen) = self.peek() {
-                        self.advance();
-                        let node = self.parse_expr(0)?;
-                        if let Some(Token::RightParen) = self.peek() {
-                            self.advance();
-                            if let Some(Token::LeftCurly) = self.peek() {
-                                self.advance();
-                                let nodes = self.parse_statement()?;
-                                if let Some(Token::RightCurly) = self.peek() {
-                                    self.advance();
+                    if let Some(Token::LeftParen) = self.next() {
+                        let node = self.parse_expr(0, env)?;
+                        if let Some(Token::RightParen) = self.next() {
+                            if let Some(Token::LeftCurly) = self.next() {
+                                let nodes = self.parse_statement(&mut env.clone())?;
+                                if let Some(Token::RightCurly) = self.next() {
                                     Ok(ParseNode::new(Token::While, Some(Box::new(node)), nodes))
                                 } else {
                                     Err("Missing right curly in while loop".to_string())
@@ -125,53 +125,41 @@ impl Parser {
                                 Err("Missing left curly in while loop".to_string())
                             }
                         } else {
-                            Err(
-                                "While conditon doesn't have a closing paranthesis".to_string()
-                            )
+                            Err("While conditon doesn't have a closing paranthesis".to_string())
                         }
                     } else {
                         Err("Missing open paranthesis in while loop".to_string())
                     }
                 }
                 Token::If => {
-                    self.advance();
-                    if let Some(Token::LeftParen) = self.peek() {
-                        self.advance();
-                        let if_cond = self.parse_expr(0)?;
-                        if self.peek() != Some(Token::RightParen) {
+                    if let Some(Token::LeftParen) = self.next() {
+                        let if_cond = self.parse_expr(0, env)?;
+                        if self.next() != Some(Token::RightParen) {
                             return Err("If condition not closed".to_string());
                         }
-                        self.advance();
-                        if self.peek() != Some(Token::LeftCurly) {
+                        if self.next() != Some(Token::LeftCurly) {
                             return Err("If condition must start with curly braces".to_string());
                         }
-                        self.advance();
-                        let mut nodes = self.parse_statement()?;
-                        if self.peek() != Some(Token::RightCurly) {
+                        let mut nodes = self.parse_statement(&mut env.clone())?;
+                        if self.next() != Some(Token::RightCurly) {
                             return Err("If block not closed".to_string());
                         }
-                        self.advance();
                         let mut res = vec![];
-                        while let Some(Token::Elif) = self.peek() {
-                            self.advance();
-                            if self.peek() != Some(Token::LeftParen) {
+                        while let Some(Token::Elif) = self.next() {
+                            if self.next() != Some(Token::LeftParen) {
                                 return Err(
                                     "Elif condition must start with paranthesis".to_string()
                                 );
                             }
-                            self.advance();
-                            let elif_cond = self.parse_expr(0)?;
-                            if self.peek() != Some(Token::RightParen) {
+                            let elif_cond = self.parse_expr(0, env)?;
+                            if self.next() != Some(Token::RightParen) {
                                 return Err("Elif condition not closed".to_string());
                             }
-                            self.advance();
-                            if self.peek() != Some(Token::LeftCurly) {
+                            if self.next() != Some(Token::LeftCurly) {
                                 return Err("Elif bloc must start with curly braces".to_string());
                             }
-                            self.advance();
-                            let statements = self.parse_statement()?;
-                            if let Some(Token::RightCurly) = self.peek() {
-                                self.advance();
+                            let statements = self.parse_statement(&mut env.clone())?;
+                            if let Some(Token::RightCurly) = self.next() {
                                 res.push(ParseNode::new(
                                     Token::Elif,
                                     Some(Box::new(elif_cond)),
@@ -181,17 +169,14 @@ impl Parser {
                                 return Err("Elif block not closed".to_string());
                             }
                         }
-                        if self.peek() == Some(Token::Else) {
-                            self.advance();
-                            if self.peek() != Some(Token::LeftCurly) {
+                        if self.next() == Some(Token::Else) {
+                            if self.next() != Some(Token::LeftCurly) {
                                 return Err("Else bloc must start with curly braces".to_string());
                             }
-                            self.advance();
-                            let statements = self.parse_statement()?;
-                            if self.peek() != Some(Token::RightCurly) {
+                            let statements = self.parse_statement(&mut env.clone())?;
+                            if self.next() != Some(Token::RightCurly) {
                                 return Err("Else block not closed".to_string());
                             }
-                            self.advance();
                             res.push(ParseNode::new(Token::Else, None, statements))
                         }
                         nodes.append(&mut res);
@@ -200,7 +185,17 @@ impl Parser {
                         Err("If condition must start with an open paranthesis".to_string())
                     }
                 }
-                _ => Err("Not implemented".to_string()),
+                Token::Print => {
+                    if self.next() != Some(Token::LeftParen) {
+                        return Err("Left paranthesis missing in function call".to_string());
+                    }
+                    let print_node = self.parse_expr(0, env)?;
+                    if self.next() != Some(Token::RightParen) {
+                        return Err("Right paranthesis missing in function call".to_string());
+                    }
+                    Ok(ParseNode::new(Token::Print, None, vec![print_node]))
+                }
+                _ => Err(format!("Invalid token {:?}", t)),
             },
             _ => Err("Couldn't be parsed".to_string()),
         }
@@ -208,22 +203,39 @@ impl Parser {
 
     fn infix_binding_power(op: &Operator) -> (u8, u8) {
         match op {
-            Operator::Plus | Operator::Minus => (1, 2),
-            Operator::Multiply | Operator::Divide => (3, 4),
+            Operator::Equality => (9, 10),
+            Operator::LessThan | Operator::LessThanEqual => (11, 12),
+            Operator::GreaterThan | Operator::GreaterThanEqual => (13, 14),
+            Operator::Plus | Operator::Minus => (15, 16),
+            Operator::Multiply | Operator::Divide => (17, 18),
             _ => panic!("Bad"),
         }
     }
 
-    fn parse_expr(&mut self, cur_bp: u8) -> Result<ParseNode, String> {
-        let mut lhs = match self.peek() {
-            Some(t) => ParseNode::new(t, None, vec![]),
+    fn prefix_binding_power(op: &Operator) -> u8 {
+        match op {
+            Operator::Plus | Operator::Minus => 5,
+            _ => panic!("Bad operator {:?}", op),
+        }
+    }
+
+    fn parse_expr(&mut self, cur_bp: u8, env: &HashSet<Token>) -> Result<ParseNode, String> {
+        let mut lhs = match self.next() {
+            Some(t @ Token::Number(_)) => ParseNode::new(t, None, vec![]),
+            Some(t @ Token::Identifier(_)) => {
+                if env.get(&t).is_none() {
+                    colour::dark_red_ln!("{:?} used before declaration", t);
+                }
+                ParseNode::new(t, None, vec![])
+            }
+            Some(Token::Operator(op)) => {
+                let r_bp = Parser::prefix_binding_power(&op);
+                let rhs = self.parse_expr(r_bp, env)?;
+                ParseNode::new(Token::Operator(op), None, vec![rhs])
+            }
             _ => panic!("Bad lhs"),
         };
-        self.advance();
         while let Some(op) = self.peek() {
-            if op == Token::SemiColon {
-                break;
-            }
             let op = match op {
                 Token::Operator(x) => x,
                 _ => break,
@@ -233,7 +245,7 @@ impl Parser {
                 break;
             }
             self.advance();
-            let rhs = self.parse_expr(r_bp)?;
+            let rhs = self.parse_expr(r_bp, env)?;
             lhs = ParseNode::new(Token::Operator(op.clone()), None, vec![lhs, rhs]);
         }
         Ok(lhs)

@@ -103,7 +103,9 @@ impl Lexer {
                         num.push(*c);
                         self.raw_data.next();
                     }
-                    res.push(Token::Number(num.parse::<f32>().unwrap()))
+                    res.push(Token::Number(ordered_float::OrderedFloat(
+                        num.parse::<f32>().unwrap(),
+                    )))
                 }
                 '"' => {
                     let mut done = false;
@@ -172,7 +174,7 @@ impl Lexer {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Eq, Hash, Debug, PartialEq, Clone)]
 pub enum Operator {
     Plus,
     Minus,
@@ -186,7 +188,7 @@ pub enum Operator {
     Equality,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Eq, Hash, Debug, PartialEq, Clone)]
 pub enum Token {
     Operator(Operator),
     StringLiteral(String),
@@ -197,7 +199,7 @@ pub enum Token {
     Else,
     While,
     SemiColon,
-    Number(f32),
+    Number(ordered_float::OrderedFloat<f32>),
     Identifier(String),
     LeftParen,
     RightParen,
