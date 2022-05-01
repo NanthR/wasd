@@ -9,7 +9,7 @@ fn main() {
     let mut lexer = lexer::Lexer::from_file(filename);
     let lexed = lexer.lex();
     // println!("{:?}", lexed);
-    let parser = parser::Parser::new(lexed);
+    let mut parser = parser::Parser::new(lexed);
     match parser.parse() {
         Ok(p) => {
             for i in p.iter() {

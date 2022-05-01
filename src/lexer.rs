@@ -1,7 +1,6 @@
 use std::fs;
 use std::iter::Peekable;
 use std::vec::IntoIter;
-use crate::parser::ParseNode;
 
 #[derive(Debug)]
 pub struct Lexer {

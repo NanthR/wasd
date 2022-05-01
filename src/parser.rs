@@ -1,174 +1,124 @@
 use crate::lexer::{Operator, Token};
-/*
-program := statement
-statement := decl statement | decl
-decl := var_dec | if_statement
-if_statement := if cond { statement } | if cond { statement } else { statement }
-var_dec := let iden equal val
-val := expr | string
-expr := summand | summand plus expr | summand minus expr
-summand := term / summand | term * summand | term
-term := num | (expr)
-cond := expr | expr comp_op expr
-comp_op := > | >= | == | <= | <
-*/
 
-#[derive(Debug, Clone, PartialEq)]
+pub struct Parser {
+    tokens: Vec<Token>,
+    cur: usize,
+}
+
+#[derive(Debug)]
 pub struct ParseNode {
-    pub current: Token,
+    pub token: Token,
     pub children: Vec<ParseNode>,
 }
 
 impl ParseNode {
-    pub fn new(current: Token, children: Vec<ParseNode>) -> Self {
-        ParseNode { children, current }
+    fn new(token: Token, children: Vec<ParseNode>) -> Self {
+        Self { token, children }
     }
-}
-
-pub struct Parser {
-    tokens: Vec<Token>,
 }
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
-        Parser { tokens }
+        Self { tokens, cur: 0 }
     }
 
-    pub fn parse(&self) -> Result<Vec<ParseNode>, String> {
-        self.parse_statement(0).and_then(|(n, i)| {
-            if i == self.tokens.len() {
-                Ok(n)
-            } else {
-                Err("Invalid parse".to_string())
-            }
-        })
+    fn peek(&self) -> Option<Token> {
+        self.tokens.get(self.cur).cloned()
     }
 
-    fn parse_statement(&self, mut pos: usize) -> Result<(Vec<ParseNode>, usize), String> {
+    fn peek_n(&self, offset: usize) -> Option<Token> {
+        self.tokens.get(self.cur + offset).cloned()
+    }
+
+    fn advance(&mut self) {
+        self.cur += 1;
+    }
+
+    pub fn parse(&mut self) -> Result<Vec<ParseNode>, String> {
+        let res = self.parse_statement()?;
+        if self.peek().is_none() {
+            Ok(res)
+        } else {
+            Err("Invalid parse".to_string())
+        }
+    }
+
+    fn parse_statement(&mut self) -> Result<Vec<ParseNode>, String> {
         let mut res: Vec<ParseNode> = vec![];
-        while self.tokens.get(pos).is_some() && (self.tokens.get(pos) != Some(&Token::RightCurly)){
-            let (node, next_pos) = self.parse_decl(pos)?;
-            pos = next_pos;
+        while self.peek().is_some() {
+            let node = self.parse_decl()?;
             res.push(node)
         }
-        Ok((res, pos))
+        Ok(res)
     }
 
-    fn parse_decl(&self, pos: usize) -> Result<(ParseNode, usize), String> {
-        match self.tokens.get(pos) {
+    fn parse_decl(&mut self) -> Result<ParseNode, String> {
+        match self.peek() {
             Some(t) => match t {
                 Token::Let => {
                     if let (Some(id), Some(Token::Operator(Operator::Equal))) =
-                        (self.tokens.get(pos + 1), self.tokens.get(pos + 2))
+                        (self.peek_n(1), self.peek_n(2))
                     {
-                        if let Some(Token::StringLiteral(x)) = self.tokens.get(pos + 3) {
-                            Ok((
-                                ParseNode::new(
-                                    Token::Let,
-                                    vec![
-                                        ParseNode::new(id.clone(), vec![]),
-                                        ParseNode::new(Token::StringLiteral(x.to_string()), vec![]),
-                                    ],
-                                ),
-                                pos + 4,
+                        self.advance();
+                        self.advance();
+                        self.advance();
+                        println!("{:?}", self.peek());
+                        if let Some(Token::StringLiteral(x)) = self.peek() {
+                            self.advance();
+                            Ok(ParseNode::new(
+                                Token::Let,
+                                vec![
+                                    ParseNode::new(id.clone(), vec![]),
+                                    ParseNode::new(Token::StringLiteral(x.to_string()), vec![]),
+                                ],
                             ))
                         } else {
-                            let (node, next_pos) = self.parse_expr(pos + 3)?;
-                            Ok((
-                                ParseNode::new(
-                                    Token::Let,
-                                    vec![ParseNode::new(id.clone(), vec![]), node],
-                                ),
-                                next_pos,
+                            let node = self.parse_expr(0)?;
+                            Ok(ParseNode::new(
+                                Token::Let,
+                                vec![ParseNode::new(id.clone(), vec![]), node],
                             ))
                         }
                     } else {
                         Err("Invalid decl".to_string())
                     }
-                },
-                Token::If => {
-                    println!("If");
-                    let (cond, next_pos) = self.parse_cond(pos + 1)?;
-                    let c = self.tokens.get(next_pos);
-                    match c {
-                        Some(Token::LeftCurly) => {
-                            let (node, next_pos) = self.parse_statement(next_pos + 1)?;
-                            println!("{:?}", node);
-                            Ok((ParseNode::new(Token::If, node), next_pos))
-                        }
-                        _ => {
-                            Err("Missing left curly brace".to_string())
-                        }
-                    }
                 }
-                x => {
-                    println!("{:?}", x);
-                    Err("Not implemented".to_string())
-                }
+                _ => Err("Not implemented".to_string()),
             },
-            None => {
-                Err("Couldn't be parsed".to_string())
-            },
+            _ => Err("Couldn't be parsed".to_string()),
         }
     }
 
-
-    fn parse_cond(&self, pos: usize) -> Result<(ParseNode, usize), String> {
-        println!("Cond");
-        let (node, next_pos) = self.parse_expr(pos)?;
-        let c = self.tokens.get(next_pos);
-        match c {
-            t @ (Some(Token::Operator(Operator::GreaterThan))
-            | Some(Token::Operator(Operator::GreaterThanEqual))
-            | Some(Token::Operator(Operator::LessThan))
-            | Some(Token::Operator(Operator::LessThanEqual))
-            | Some(Token::Operator(Operator::Equality))) => {
-                let (rhs, i) = self.parse_expr(next_pos + 1)?;
-                Ok((ParseNode::new(t.unwrap().clone(), vec![node, rhs]), i))
-            }
-            _ => Ok((node, next_pos)),
+    fn infix_binding_power(op: &Operator) -> (u8, u8) {
+        match op {
+            Operator::Plus | Operator::Minus => (1, 2),
+            Operator::Multiply | Operator::Divide => (3, 4),
+            _ => panic!("Bad"),
         }
     }
 
-    fn parse_expr(&self, pos: usize) -> Result<(ParseNode, usize), String> {
-        let (node, next_pos) = self.parse_summand(pos)?;
-        let c = self.tokens.get(next_pos);
-        match c {
-            t
-            @ (Some(Token::Operator(Operator::Plus)) | Some(Token::Operator(Operator::Minus))) => {
-                let (rhs, i) = self.parse_expr(next_pos + 1)?;
-                Ok((ParseNode::new(t.unwrap().clone(), vec![node, rhs]), i))
+    fn parse_expr(&mut self, cur_bp: u8) -> Result<ParseNode, String> {
+        let mut lhs = match self.peek() {
+            Some(t) => ParseNode::new(t.clone(), vec![]),
+            _ => panic!("Bad lhs"),
+        };
+        self.advance();
+        while let Some(op) = self.peek() {
+            if op == Token::SemiColon {
+                break;
             }
-            _ => Ok((node, next_pos)),
-        }
-    }
-
-    fn parse_summand(&self, pos: usize) -> Result<(ParseNode, usize), String> {
-        let (node, next_pos) = self.parse_term(pos)?;
-        let c = self.tokens.get(next_pos);
-        match c {
-            t @ (Some(Token::Operator(Operator::Multiply))
-            | Some(Token::Operator(Operator::Divide))) => {
-                let (rhs, i) = self.parse_summand(next_pos + 1)?;
-                Ok((ParseNode::new(t.unwrap().clone(), vec![node, rhs]), i))
+            let op = match op {
+                Token::Operator(x) => x,
+                _ => break,
+            };
+            let (l_bp, r_bp) = Parser::infix_binding_power(&op);
+            if l_bp < cur_bp {
+                break;
             }
-            _ => Ok((node, next_pos)),
+            self.advance();
+            let rhs = self.parse_expr(r_bp)?;
+            lhs = ParseNode::new(Token::Operator(op.clone()), vec![lhs, rhs]);
         }
-    }
-
-    fn parse_term(&self, pos: usize) -> Result<(ParseNode, usize), String> {
-        let c = self.tokens.get(pos);
-        if let Some(Token::LeftParen) = c {
-            let (node, next_pos) = self.parse_expr(pos + 1)?;
-            if let Some(Token::RightParen) = self.tokens.get(next_pos) {
-                Ok((node, next_pos + 1))
-            } else {
-                Err("Parantheses not closed".to_string())
-            }
-        } else if let Some(n @ Token::Number(_)) = c {
-            Ok((ParseNode::new(n.clone(), vec![]), pos + 1))
-        } else {
-            Err("Couldn't do".to_string())
-        }
+        Ok(lhs)
     }
 }
