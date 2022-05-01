@@ -2,7 +2,15 @@ use crate::parser::ParseNode;
 
 pub fn get_sexp(parse_node: &ParseNode, level: usize) -> String {
     if parse_node.children.is_empty() {
-        format!("{:?}", parse_node.token)
+        format!(
+            "{:?}{}",
+            parse_node.token,
+            if let Some(p) = &parse_node.extra_info {
+                format!("\n\t({})", get_sexp(p, level + 1))
+            } else {
+                " ".to_string()
+            }
+        )
     } else {
         format!(
             "({:?}{}\n{}{})",

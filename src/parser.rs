@@ -1,4 +1,4 @@
-use crate::lexer::{Operator, Token, TokenType};
+use crate::lexer::{FnInfo, Operator, Token, TokenType};
 use std::collections::HashSet;
 
 /*
@@ -222,6 +222,50 @@ impl Parser {
                         return Err("Right paranthesis missing in function call".to_string());
                     }
                     Ok(ParseNode::new(TokenType::Print, None, vec![print_node]))
+                }
+                TokenType::Fn(_) => {
+                    if let Some(TokenType::Identifier(id)) = self.next() {
+                        if self.next() != Some(TokenType::LeftParen) {
+                            return Err("Open paranthesis missing".to_string());
+                        }
+                        let mut parameters = vec![];
+                        let mut new_env = env.clone();
+                        while let Some(TokenType::Identifier(id)) = self.peek() {
+                            self.advance();
+                            new_env.insert(TokenType::Identifier(id.clone()));
+                            parameters.push(ParseNode::new(
+                                TokenType::Identifier(id),
+                                None,
+                                vec![],
+                            ));
+                        }
+                        if self.next() != Some(TokenType::RightParen) {
+                            return Err("Closing paranthesis missing".to_string());
+                        }
+                        if self.next() != Some(TokenType::LeftCurly) {
+                            return Err("Opening curly missing".to_string());
+                        }
+                        let nodes = self.parse_statement(&mut new_env)?;
+                        if self.next() != Some(TokenType::RightCurly) {
+                            return Err("Closing curly missing".to_string());
+                        }
+                        Ok(ParseNode::new(
+                            TokenType::Fn(Some(FnInfo::new(TokenType::Identifier(id)))),
+                            Some(Box::new(ParseNode::new(
+                                TokenType::Parameters,
+                                None,
+                                parameters,
+                            ))),
+                            nodes,
+                        ))
+                        // Ok(ParseNode::new(
+                        //     TokenType::Identifier(id),
+                        //     Some(Box::new(ParseNode::new(TokenType::Dummy, None, parameters))),
+                        //     nodes,
+                        // ))
+                    } else {
+                        Err("Identifier missing".to_string())
+                    }
                 }
                 _ => Err(format!("Invalid token {:?}", t)),
             },

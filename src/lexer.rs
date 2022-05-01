@@ -120,6 +120,7 @@ impl Lexer {
                         line_no,
                     ))
                 }
+                ',' => {}
                 '"' => {
                     let mut done = false;
                     let mut str = String::new();
@@ -178,6 +179,7 @@ impl Lexer {
                         "elif" => Token::new(TokenType::Elif, line_no),
                         "while" => Token::new(TokenType::While, line_no),
                         "else" => Token::new(TokenType::Else, line_no),
+                        "fn" => Token::new(TokenType::Fn(None), line_no),
                         _ => Token::new(TokenType::Identifier(str), line_no),
                     });
                 }
@@ -230,4 +232,21 @@ pub enum TokenType {
     RightParen,
     LeftCurly,
     RightCurly,
+    Fn(Option<FnInfo>),
+    Parameters,
+}
+
+#[derive(Eq, Hash, Debug, PartialEq, Clone)]
+pub struct FnInfo {
+    name: Box<TokenType>,
+}
+
+impl FnInfo {
+    pub fn new(t: TokenType) -> Self {
+        if let TokenType::Identifier(_) = t {
+            Self { name: Box::new(t) }
+        } else {
+            panic!("Cannot happen")
+        }
+    }
 }
