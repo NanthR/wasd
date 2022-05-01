@@ -20,15 +20,19 @@ impl Lexer {
 
     pub fn lex(&mut self) -> Vec<Token> {
         let mut res = vec![];
+        let mut line_no = 1;
         while let Some(c) = self.raw_data.next() {
             match c {
-                '\n' | ' ' | '\t' => {}
-                '+' => res.push(Token::Operator(Operator::Plus)),
-                '-' => res.push(Token::Operator(Operator::Minus)),
-                '(' => res.push(Token::LeftParen),
-                ')' => res.push(Token::RightParen),
-                '{' => res.push(Token::LeftCurly),
-                '}' => res.push(Token::RightCurly),
+                '\n' => {
+                    line_no += 1;
+                }
+                ' ' | '\t' => {}
+                '+' => res.push(Token::new(TokenType::Operator(Operator::Plus), line_no)),
+                '-' => res.push(Token::new(TokenType::Operator(Operator::Minus), line_no)),
+                '(' => res.push(Token::new(TokenType::LeftParen, line_no)),
+                ')' => res.push(Token::new(TokenType::RightParen, line_no)),
+                '{' => res.push(Token::new(TokenType::LeftCurly, line_no)),
+                '}' => res.push(Token::new(TokenType::RightCurly, line_no)),
                 '/' => {
                     if let Some(x) = self.raw_data.peek() {
                         if *x == '/' {
@@ -39,16 +43,18 @@ impl Lexer {
                                 }
                             }
                         } else {
-                            res.push(Token::Operator(Operator::Divide))
+                            res.push(Token::new(TokenType::Operator(Operator::Divide), line_no))
                         }
                     }
                 }
-                '*' => res.push(Token::Operator(Operator::Multiply)),
-                // ';' => {},
+                '*' => res.push(Token::new(TokenType::Operator(Operator::Multiply), line_no)),
                 '>' => {
                     let is_done = if let Some(x) = self.raw_data.peek() {
                         if *x == '=' {
-                            res.push(Token::Operator(Operator::GreaterThanEqual));
+                            res.push(Token::new(
+                                TokenType::Operator(Operator::GreaterThanEqual),
+                                line_no,
+                            ));
                             self.raw_data.next();
                             true
                         } else {
@@ -58,13 +64,19 @@ impl Lexer {
                         false
                     };
                     if !is_done {
-                        res.push(Token::Operator(Operator::GreaterThan))
+                        res.push(Token::new(
+                            TokenType::Operator(Operator::GreaterThan),
+                            line_no,
+                        ));
                     }
                 }
                 '<' => {
                     let is_done = if let Some(x) = self.raw_data.peek() {
                         if *x == '=' {
-                            res.push(Token::Operator(Operator::LessThanEqual));
+                            res.push(Token::new(
+                                TokenType::Operator(Operator::LessThanEqual),
+                                line_no,
+                            ));
                             self.raw_data.next();
                             true
                         } else {
@@ -74,14 +86,14 @@ impl Lexer {
                         false
                     };
                     if !is_done {
-                        res.push(Token::Operator(Operator::LessThan))
+                        res.push(Token::new(TokenType::Operator(Operator::LessThan), line_no));
                     }
                 }
-                ';' => res.push(Token::SemiColon),
+                ';' => res.push(Token::new(TokenType::SemiColon, line_no)),
                 '=' => {
                     let is_done = if let Some(x) = self.raw_data.peek() {
                         if *x == '=' {
-                            res.push(Token::Operator(Operator::Equality));
+                            res.push(Token::new(TokenType::Operator(Operator::Equality), line_no));
                             self.raw_data.next();
                             true
                         } else {
@@ -91,7 +103,7 @@ impl Lexer {
                         false
                     };
                     if !is_done {
-                        res.push(Token::Operator(Operator::Equal));
+                        res.push(Token::new(TokenType::Operator(Operator::Equal), line_no));
                     }
                 }
                 n @ '0'..='9' => {
@@ -103,9 +115,10 @@ impl Lexer {
                         num.push(*c);
                         self.raw_data.next();
                     }
-                    res.push(Token::Number(ordered_float::OrderedFloat(
-                        num.parse::<f32>().unwrap(),
-                    )))
+                    res.push(Token::new(
+                        TokenType::Number(ordered_float::OrderedFloat(num.parse::<f32>().unwrap())),
+                        line_no,
+                    ))
                 }
                 '"' => {
                     let mut done = false;
@@ -143,7 +156,7 @@ impl Lexer {
                         println!("Error");
                         break;
                     }
-                    res.push(Token::StringLiteral(str));
+                    res.push(Token::new(TokenType::StringLiteral(str), line_no))
                 }
                 x => {
                     if !x.is_alphanumeric() {
@@ -159,13 +172,13 @@ impl Lexer {
                         self.raw_data.next();
                     }
                     res.push(match str.as_str() {
-                        "print" => Token::Print,
-                        "let" => Token::Let,
-                        "if" => Token::If,
-                        "elif" => Token::Elif,
-                        "while" => Token::While,
-                        "else" => Token::Else,
-                        _ => Token::Identifier(str),
+                        "print" => Token::new(TokenType::Print, line_no),
+                        "let" => Token::new(TokenType::Let, line_no),
+                        "if" => Token::new(TokenType::If, line_no),
+                        "elif" => Token::new(TokenType::Elif, line_no),
+                        "while" => Token::new(TokenType::While, line_no),
+                        "else" => Token::new(TokenType::Else, line_no),
+                        _ => Token::new(TokenType::Identifier(str), line_no),
                     });
                 }
             }
@@ -189,7 +202,19 @@ pub enum Operator {
 }
 
 #[derive(Eq, Hash, Debug, PartialEq, Clone)]
-pub enum Token {
+pub struct Token {
+    pub token: TokenType,
+    pub line_no: usize,
+}
+
+impl Token {
+    fn new(token: TokenType, line_no: usize) -> Self {
+        Self { token, line_no }
+    }
+}
+
+#[derive(Eq, Hash, Debug, PartialEq, Clone)]
+pub enum TokenType {
     Operator(Operator),
     StringLiteral(String),
     Print,
