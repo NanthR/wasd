@@ -161,6 +161,7 @@ impl Lexer {
                         "let" => Token::Let,
                         "if" => Token::If,
                         "elif" => Token::Elif,
+                        "while" => Token::While,
                         "else" => Token::Else,
                         _ => Token::Identifier(str),
                     });
@@ -194,6 +195,7 @@ pub enum Token {
     If,
     Elif,
     Else,
+    While,
     SemiColon,
     Number(f32),
     Identifier(String),
