@@ -11,7 +11,7 @@ fn main() {
     match parser.parse() {
         Ok(p) => {
             for i in p.iter() {
-                println!("{}", utils::get_sexp(i));
+                println!("{}", utils::get_sexp(i, 1));
             }
         }
         Err(x) => println!("{}", x),

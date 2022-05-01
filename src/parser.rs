@@ -145,7 +145,8 @@ impl Parser {
                             return Err("If block not closed".to_string());
                         }
                         let mut res = vec![];
-                        while let Some(Token::Elif) = self.next() {
+                        while let Some(Token::Elif) = self.peek() {
+                            self.advance();
                             if self.next() != Some(Token::LeftParen) {
                                 return Err(
                                     "Elif condition must start with paranthesis".to_string()
@@ -169,7 +170,8 @@ impl Parser {
                                 return Err("Elif block not closed".to_string());
                             }
                         }
-                        if self.next() == Some(Token::Else) {
+                        if self.peek() == Some(Token::Else) {
+                            self.advance();
                             if self.next() != Some(Token::LeftCurly) {
                                 return Err("Else bloc must start with curly braces".to_string());
                             }
