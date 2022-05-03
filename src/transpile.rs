@@ -1,4 +1,4 @@
-use crate::lexer::{Operator, TokenType};
+use crate::lexer::TokenType;
 use crate::parser::ParseNode;
 
 pub struct Transpiler {
@@ -113,6 +113,32 @@ impl Transpiler {
                 " ".repeat(level),
                 Transpiler::convert_to_python(node.children.get(0).unwrap(), level)?
             )),
+            TokenType::Fn(x) => {
+                if let Some(info) = x {
+                    if let TokenType::Identifier(x) = &*info.name {
+                        let mut param_list = vec![];
+                        for param in node.extra_info.as_ref().unwrap().children.iter() {
+                            param_list.push(Transpiler::convert_to_python(param, 0)?);
+                        }
+                        let mut statement_list = vec![];
+                        for statement in node.children.iter() {
+                            statement_list
+                                .push(Transpiler::convert_to_python(&statement, level + 1)?);
+                        }
+                        Ok(format!(
+                            "{}def {}({}):\n{}",
+                            " ".repeat(level),
+                            x,
+                            param_list.join(","),
+                            statement_list.join("\n")
+                        ))
+                    } else {
+                        unreachable!()
+                    }
+                } else {
+                    Err("Name of function is missing".to_string())
+                }
+            }
             _ => Ok("".to_string()),
         }
     }

@@ -256,7 +256,7 @@ pub enum TokenType {
 
 #[derive(Eq, Hash, Debug, PartialEq, Clone)]
 pub struct FnInfo {
-    name: Box<TokenType>,
+    pub name: Box<TokenType>,
 }
 
 impl FnInfo {
