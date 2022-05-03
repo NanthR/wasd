@@ -229,7 +229,7 @@ impl Parser {
                             return Err("Open paranthesis missing".to_string());
                         }
                         let mut parameters = vec![];
-                        let mut new_env = env.clone();
+                        let mut new_env = HashSet::<TokenType>::new();
                         while let Some(TokenType::Identifier(id)) = self.peek() {
                             self.advance();
                             new_env.insert(TokenType::Identifier(id.clone()));

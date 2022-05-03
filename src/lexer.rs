@@ -1,4 +1,5 @@
 use std::fs;
+use std::fmt;
 use std::iter::Peekable;
 use std::vec::IntoIter;
 
@@ -201,6 +202,23 @@ pub enum Operator {
     GreaterThan,
     GreaterThanEqual,
     Equality,
+}
+
+impl fmt::Display for Operator {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Operator::Plus => write!(f, "+"),
+            Operator::Minus => write!(f, "-"),
+            Operator::Multiply => write!(f, "*"),
+            Operator::Divide => write!(f, "/"),
+            Operator::Equal => write!(f, "="),
+            Operator::LessThanEqual => write!(f, "<="),
+            Operator::LessThan => write!(f, "<"),
+            Operator::GreaterThan => write!(f, ">"),
+            Operator::GreaterThanEqual => write!(f, ">="),
+            Operator::Equality => write!(f, "=="),
+        }
+    }
 }
 
 #[derive(Eq, Hash, Debug, PartialEq, Clone)]

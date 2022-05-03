@@ -1,6 +1,7 @@
 mod lexer;
 mod parser;
 mod utils;
+mod transpile;
 
 fn main() {
     let filename = "test.asdf";
@@ -10,8 +11,16 @@ fn main() {
     let mut parser = parser::Parser::new(lexed);
     match parser.parse() {
         Ok(p) => {
-            for i in p.iter() {
-                println!("{}", utils::get_sexp(i, 1));
+            println!("Intermediate code => S Expressions\n");
+            for n in p.iter() {
+                println!("{}", crate::utils::get_sexp(n, 0));
+            }
+            println!();
+            let transpiler = transpile::Transpiler::new(p);
+            println!("Transpiled code to python\n");
+            match transpiler.transpile() {
+                Ok(t) => println!("{}", t),
+                Err(x) => println!("{}", x)
             }
         }
         Err(x) => println!("{}", x),
