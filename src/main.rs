@@ -2,6 +2,8 @@ mod lexer;
 mod parser;
 mod utils;
 mod transpile;
+use std::io::Write;
+use std::fs;
 
 fn main() {
     let filename = "test.asdf";
@@ -19,7 +21,11 @@ fn main() {
             let transpiler = transpile::Transpiler::new(p);
             println!("Transpiled code to python\n");
             match transpiler.transpile() {
-                Ok(t) => println!("{}", t),
+                Ok(t) => {
+                    let mut f = fs::File::create("result.py").expect("Couldn't create file");
+                    write!(f, "{}", t);
+                    println!("Written to result.py");
+                },
                 Err(x) => println!("{}", x)
             }
         }
